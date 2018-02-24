@@ -25,37 +25,92 @@ namespace NAVObjectVersion
             TODO:
             Error Checking
             Beautify
-            Check for wrong clipboard
-            check for empty clipboard
             try to skip having a local copy of word document
             user settings for template?
+            change random file function to incremental
             */
         }
 
         private void b_LoadClipboard_Click(object sender, EventArgs e)
         {
-            b_PasteClipBoard.Enabled = false;
-            this.Cursor = Cursors.WaitCursor;
 
+            if (!CheckClipboard())
+            {
+                return;
+            }
+            else
+            {
+                //Clipboard is OK, start processing
+                b_PasteClipBoard.Enabled = false;
+                this.Cursor = Cursors.WaitCursor;
+
+                ProcessClipboard();
+
+                this.Cursor = Cursors.Default;
+                MessageBox.Show("Finished!","Success",MessageBoxButtons.OK,MessageBoxIcon.Information);
+                b_PasteClipBoard.Text = "Paste Clipboard";
+                b_PasteClipBoard.Enabled = true;
+            }           
+        }
+
+        private bool CheckClipboard()
+        {
+            //Check if Clipboard contains NAV objects list
+            bool ClipBoardErrorsExist = false;
+            using (StringReader reader = new StringReader(Clipboard.GetText()))
+            {
+                string line = string.Empty;
+                line = reader.ReadLine();
+                if (line != null)
+                {
+                    if (line.Substring(0, 7) != "Type\tID")
+                    {
+                        ClipBoardErrorsExist = true;
+                        MessageBox.Show("Content is not a NAV Object List", "Clipboard Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+                else
+                {
+                    ClipBoardErrorsExist = true;
+                    MessageBox.Show("Clipboard is empty.", "Clipboard Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            return !ClipBoardErrorsExist;
+        }
+
+        private void ProcessClipboard()
+        {
             Excel.Application xlApp = new Excel.Application();
+            Word.Application WordApp = new Word.Application();
 
             if (xlApp == null)
             {
-                MessageBox.Show("Excel is not properly installed!!");
+                MessageBox.Show("Excel is not properly installed!!","Excel COM error",MessageBoxButtons.OK,MessageBoxIcon.Error);
                 return;
             }
+
+            if (WordApp == null)
+            {
+                MessageBox.Show("Word is not properly installed!!", "Word COM error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
+            object miss = System.Reflection.Missing.Value; //Common for Excel and Word
+
+            b_PasteClipBoard.Text = "Processing Clipboard to Excel";
 
             xlApp.Visible = false;
             Excel.Workbook xlWorkBook;
             Excel.Worksheet xlWorkSheet;
-            object misValue = System.Reflection.Missing.Value;
-            xlWorkBook = xlApp.Workbooks.Add(misValue);
+            xlWorkBook = xlApp.Workbooks.Add(miss);
             xlWorkSheet = (Excel.Worksheet)xlWorkBook.Worksheets.get_Item(1);
 
             //Fix WorkSheet Font & Font Size
             xlApp.StandardFont = "Arial";
             xlApp.StandardFontSize = 9.5;
 
+
+            //Format all Cells are Text
             Excel.Range xlCells = xlWorkBook.Worksheets[1].Cells;
             xlCells.NumberFormat = "@";
 
@@ -64,6 +119,7 @@ namespace NAVObjectVersion
             int totalxlRows = 0;
             int totalxlCols = 0;
 
+            //Copy Clipboard content to Excel Worksheet
             using (StringReader reader = new StringReader(Clipboard.GetText()))
             {
                 string line = string.Empty;
@@ -76,7 +132,7 @@ namespace NAVObjectVersion
                         foreach (string field in fieldArr)
                         {
                             xlWorkSheet.Cells[rowID, colID] = field;
-                            colID++;                            
+                            colID++;
                         }
                         if (rowID == 1)
                         {
@@ -87,6 +143,13 @@ namespace NAVObjectVersion
                     }
                 } while ((line != null));
                 totalxlRows = rowID - 1;
+            }
+
+            //Check that we have imported at least one full row
+            if ((totalxlRows == 0) || (totalxlCols == 0))
+            {
+                MessageBox.Show("No data were copied to Excel", "Excel Processing Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
 
             //Fix Data
@@ -107,66 +170,64 @@ namespace NAVObjectVersion
                     }
                 }
 
+                /*
+                //Change Version Header Text to match Release Notes Header Text
                 if (xlWorkSheet.Cells[1, currCol].Value.ToString() == "Version List")
                 {
                     xlWorkSheet.Cells[1, currCol] = "Version";
                 }
+                */
             }
+
+
+            //Finished importing data to Excel Proceed with Word
+            b_PasteClipBoard.Text = "Processing Excel to Word";
 
             //Copy Data To Word
             this.Cursor = Cursors.Default;
 
             // Create an instance of the Open File Dialog Box
-            var openFileDialog1 = new OpenFileDialog();
+            var templateFileDialog = new OpenFileDialog();
 
             // Set filter options and filter index
-            openFileDialog1.Filter = "Word Documents (.docx)|*.docx|All files (*.*)|*.*";
-            openFileDialog1.FilterIndex = 1;
-            openFileDialog1.Multiselect = false;
+            templateFileDialog.Title = "Select Table Template  Word File";
+            templateFileDialog.Filter = "Word Documents (.docx)|*.docx";
+            templateFileDialog.FilterIndex = 1;
+            templateFileDialog.Multiselect = false;
+            templateFileDialog.ShowDialog();
+            object templatePath = templateFileDialog.FileName;
+            string templateFileName = Path.GetFileNameWithoutExtension(templateFileDialog.FileName);
 
-            // Call the ShowDialog method to show the dialog box.
-            openFileDialog1.ShowDialog();
-            //txtDocument.Text = openFileDialog1.FileName;
-
-            bool showWord = true;
-
-            Word.Application WordApp = new Word.Application();
+            bool showWord = true;            
             WordApp.Visible = showWord;
-
-            object miss = System.Reflection.Missing.Value;
-            object path = openFileDialog1.FileName;
-
-            Random random = new Random();
-            int randomNumber = random.Next(0, 100);
-            object path2 = path + randomNumber.ToString() + ".docx";
-            File.Copy(path.ToString(), path2.ToString(), true);
-            object readOnly = false;
-            object SaveChanges = true;
             object visible = true;
-            
+            object SaveChanges = true;
+
+            object workingPath = @"C:\Temp\" + templateFileName + "-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".docx";
+            File.Copy(templatePath.ToString(), workingPath.ToString(), true);
+
             this.Cursor = Cursors.WaitCursor;
 
-            Word.Document docs = WordApp.Documents.Open(ref path2, ref miss, ref readOnly,
+            Word.Document docs = WordApp.Documents.Open(ref workingPath, ref miss, ref miss,
                                            ref miss, ref miss, ref miss, ref miss,
                                            ref miss, ref miss, ref miss, ref visible,
                                            ref miss, ref miss, ref miss, ref miss,
                                            ref miss);
 
-
             //Get First Word Table
             Word.Table wordTable = docs.Tables[1];
-            Word.Row wordHeadRow = wordTable.Rows[1];
+
             //Create Extra Lines to fit Excel Data
-            for (int i=2; i < totalxlRows; i++) //Template already has 1 line
+            for (int i = 2; i < totalxlRows; i++) //Template already has 1 line
             {
                 wordTable.Rows.Add();
             }
 
-            foreach (Word.Cell c in wordHeadRow.Cells)
-            {               
-                for (int currxlCol = 1; currxlCol <= totalxlCols; currxlCol++)
+            //Fill Table with Excel Data
+            foreach (Word.Cell c in wordTable.Rows[1].Cells) //Loop through Word Table Columns
+            {
+                for (int currxlCol = 1; currxlCol <= totalxlCols; currxlCol++) //Loop through Excel Columns
                 {
-                    Console.WriteLine("Excel: " + xlWorkSheet.Cells[1, currxlCol].Value.ToString() + " <=> Word: " + c.Range.Text.ToString());
                     string xlString = xlWorkSheet.Cells[1, currxlCol].Value.ToString();
                     if (xlString.IndexOf(" ") > -1)
                     {
@@ -174,8 +235,9 @@ namespace NAVObjectVersion
                     }
                     string wordString = c.Range.Text.ToString();
                     Console.WriteLine("Excel: " + xlString + " <=> Word: " + wordString);
+
                     //Populate Object Type
-                    if (xlWorkSheet.Cells[1, currxlCol].Value.ToString().Trim() == "Type" && c.Range.Text.ToString().IndexOf(xlString) > -1)
+                    if (xlString == "Type" && wordString.IndexOf(xlString) > -1)
                     {
                         for (int currxlRow = 2; currxlRow <= totalxlRows; currxlRow++)
                         {
@@ -183,7 +245,7 @@ namespace NAVObjectVersion
                         }
                     }
                     //Populate Object ID
-                    if (xlWorkSheet.Cells[1, currxlCol].Value.ToString().Trim() == "ID" && c.Range.Text.ToString().IndexOf(xlString) > -1)
+                    if (xlString == "ID" && wordString.IndexOf(xlString) > -1)
                     {
                         for (int currxlRow = 2; currxlRow <= totalxlRows; currxlRow++)
                         {
@@ -192,7 +254,7 @@ namespace NAVObjectVersion
                     }
 
                     //Populate Name
-                    if (xlWorkSheet.Cells[1, currxlCol].Value.ToString().Trim() == "Name" && c.Range.Text.ToString().IndexOf(xlString) > -1)
+                    if (xlString == "Name" && wordString.IndexOf(xlString) > -1)
                     {
                         for (int currxlRow = 2; currxlRow <= totalxlRows; currxlRow++)
                         {
@@ -201,7 +263,7 @@ namespace NAVObjectVersion
                     }
 
                     //Populate Modified
-                    if (xlWorkSheet.Cells[1, currxlCol].Value.ToString().Trim() == "Modified" && c.Range.Text.ToString().IndexOf(xlString) > -1)
+                    if (xlString == "Modified" && wordString.IndexOf(xlString) > -1)
                     {
                         for (int currxlRow = 2; currxlRow <= totalxlRows; currxlRow++)
                         {
@@ -210,7 +272,7 @@ namespace NAVObjectVersion
                     }
 
                     //Populate Version
-                    if (xlWorkSheet.Cells[1, currxlCol].Value.ToString().Trim() == "Version" && c.Range.Text.ToString().IndexOf(xlString) > -1)
+                    if (xlString == "Version" && wordString.IndexOf(xlString) > -1)
                     {
                         for (int currxlRow = 2; currxlRow <= totalxlRows; currxlRow++)
                         {
@@ -219,7 +281,7 @@ namespace NAVObjectVersion
                     }
 
                     //Populate Date
-                    if (xlWorkSheet.Cells[1, currxlCol].Value.ToString().Trim() == "Date" && c.Range.Text.ToString().IndexOf(xlString) > -1)
+                    if (xlString == "Date" && wordString.IndexOf(xlString) > -1)
                     {
                         for (int currxlRow = 2; currxlRow <= totalxlRows; currxlRow++)
                         {
@@ -228,7 +290,7 @@ namespace NAVObjectVersion
                     }
 
                     //Populate Time
-                    if (xlWorkSheet.Cells[1, currxlCol].Value.ToString().Trim() == "Time" && c.Range.Text.ToString().IndexOf(xlString) > -1)
+                    if (xlString == "Time" && wordString.IndexOf(xlString) > -1)
                     {
                         for (int currxlRow = 2; currxlRow <= totalxlRows; currxlRow++)
                         {
@@ -240,7 +302,7 @@ namespace NAVObjectVersion
 
 
             //xlWorkBook.SaveAs(@"C:\Temp\csharp-Excel.xls", Excel.XlFileFormat.xlWorkbookNormal, misValue, misValue, misValue, misValue, Excel.XlSaveAsAccessMode.xlExclusive, misValue, misValue, misValue, misValue, misValue);
-            xlWorkBook.Close(false, misValue, misValue);
+            xlWorkBook.Close(false, miss, miss);
 
             //Clear Excel Variables
             xlApp.Application.Quit();
@@ -265,23 +327,18 @@ namespace NAVObjectVersion
                 WordApp.Quit();
             }
 
-            Marshal.ReleaseComObject(wordHeadRow);
             Marshal.ReleaseComObject(wordTable);
             Marshal.ReleaseComObject(docs);
             Marshal.ReleaseComObject(WordApp);
 
-            wordHeadRow = null;
             wordTable = null;
             docs = null;
             WordApp = null;
 
             GC.Collect();
-            
-            MessageBox.Show("Done");
-            this.Cursor = Cursors.Default;
-            b_PasteClipBoard.Enabled = true;
         }
 
+        //Field Formatting Functions
         private string FormatType(string objTypeNum)
         {
             switch(objTypeNum)
@@ -311,6 +368,5 @@ namespace NAVObjectVersion
                 return DateTime.ParseExact(oldDate, "dd/MM/yy", CultureInfo.InvariantCulture).ToString("dd/MM/yy");
             }
         }
-
     }
 }
