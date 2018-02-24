@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.27130.2024
+VisualStudioVersion = 15.0.27130.2036
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NAVObjectVersion", "NAVObjectVersion\NAVObjectVersion.csproj", "{A7F3E7E0-646B-4E6D-8CA7-4DDBB9B393C4}"
 EndProject

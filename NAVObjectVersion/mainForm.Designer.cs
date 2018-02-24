@@ -28,11 +28,13 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(mainForm));
             this.b_PasteClipBoard = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // b_PasteClipBoard
             // 
+            this.b_PasteClipBoard.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.b_PasteClipBoard.Location = new System.Drawing.Point(13, 13);
             this.b_PasteClipBoard.Name = "b_PasteClipBoard";
             this.b_PasteClipBoard.Size = new System.Drawing.Size(161, 138);
@@ -48,6 +50,7 @@
             this.ClientSize = new System.Drawing.Size(187, 164);
             this.Controls.Add(this.b_PasteClipBoard);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "mainForm";
