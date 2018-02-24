@@ -9,12 +9,13 @@ using Word = Microsoft.Office.Interop.Word;
 
 namespace NAVObjectVersion
 {
-    public partial class mainForm : Form
+    public partial class MainForm : Form
     {
 
         List<string> tempFilesCreated = new List<string>();
+        string TempDir = @"C:\Temp\";
 
-        public mainForm()
+        public MainForm()
         {
             InitializeComponent();
 
@@ -29,10 +30,12 @@ namespace NAVObjectVersion
                 b_PasteClipBoard.Enabled = false;
                 this.Cursor = Cursors.WaitCursor;
 
-                ProcessClipboard();
+                if (ProcessClipboard())
+                {
+                    MessageBox.Show("Finished!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
 
                 this.Cursor = Cursors.Default;
-                MessageBox.Show("Finished!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 b_PasteClipBoard.Text = "Paste Clipboard";
                 b_PasteClipBoard.Enabled = true;
             }       
@@ -63,7 +66,7 @@ namespace NAVObjectVersion
             return !ClipBoardErrorsExist;
         }
 
-        private void ProcessClipboard()
+        private bool ProcessClipboard()
         {
             Excel.Application xlApp = new Excel.Application();
             Word.Application WordApp = new Word.Application();
@@ -71,13 +74,13 @@ namespace NAVObjectVersion
             if (xlApp == null)
             {
                 MessageBox.Show("Excel is not properly installed!!","Excel COM error",MessageBoxButtons.OK,MessageBoxIcon.Error);
-                return;
+                return false;
             }
 
             if (WordApp == null)
             {
                 MessageBox.Show("Word is not properly installed!!", "Word COM error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
+                return false;
             }
 
             object miss = System.Reflection.Missing.Value; //Common for Excel and Word
@@ -134,7 +137,7 @@ namespace NAVObjectVersion
             if ((totalxlRows == 0) || (totalxlCols == 0))
             {
                 MessageBox.Show("No data were copied to Excel", "Excel Processing Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
+                return false;
             }
 
             //Fix Data
@@ -174,7 +177,12 @@ namespace NAVObjectVersion
             templateFileDialog.ShowDialog();
             object templatePath = templateFileDialog.FileName;
             string templateFileName = Path.GetFileNameWithoutExtension(templateFileDialog.FileName);
-
+            //Check if user selected a template file or cancelled.
+            if (templateFileName == null || templateFileName == "")
+            {
+                MessageBox.Show("You didn't select any template. Please restart your process.", "Template Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
             this.Cursor = Cursors.WaitCursor;
 
             bool showWord = true;            
@@ -182,7 +190,11 @@ namespace NAVObjectVersion
             object visible = true;
             object SaveChanges = true;
 
-            object workingPath = @"C:\Temp\" + templateFileName + "-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".docx";
+            //Check if C:\Temp exists else create it
+            Directory.CreateDirectory(TempDir);
+
+            object workingPath = TempDir + templateFileName + "-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".docx";
+            //Copy the template so we don't make any changes in it.
             File.Copy(templatePath.ToString(), workingPath.ToString(), true);
 
             tempFilesCreated.Add(workingPath.ToString());
@@ -313,6 +325,8 @@ namespace NAVObjectVersion
             WordApp = null;
 
             GC.Collect();
+
+            return true;
         }
 
         //Field Formatting Functions
@@ -353,6 +367,9 @@ namespace NAVObjectVersion
 
         private void closeForm()
         {
+            b_PasteClipBoard.Text = "Waiting for Word to close.";
+            System.Threading.Thread.Sleep(3000); //Wait for MS Word to close;
+
             try
             {
                 if (tempFilesCreated.Count > 0)
@@ -378,7 +395,7 @@ namespace NAVObjectVersion
                 {
                     if (tempFilesCreated.Count > 0)
                     {
-                        MessageBox.Show("Some Word Documents created, were not deleted as they are still open. Please delete them from C:\\Temp\\ folder", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show("Some Word Documents created, were not deleted as they are still open. Please delete them from " + TempDir + " folder", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
             }            
