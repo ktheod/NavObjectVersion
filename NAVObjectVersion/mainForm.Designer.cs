@@ -53,6 +53,7 @@
             this.Name = "mainForm";
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Hide;
             this.Text = "NAV Object Version Fixer";
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.mainForm_FormClosing);
             this.ResumeLayout(false);
 
         }

@@ -1,14 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 using Excel = Microsoft.Office.Interop.Excel;
 using Word = Microsoft.Office.Interop.Word;
@@ -17,28 +11,19 @@ namespace NAVObjectVersion
 {
     public partial class mainForm : Form
     {
+
+        List<string> tempFilesCreated = new List<string>();
+
         public mainForm()
         {
             InitializeComponent();
 
-            /*
-            TODO:
-            Error Checking
-            Beautify
-            try to skip having a local copy of word document
-            user settings for template?
-            change random file function to incremental
-            */
         }
 
         private void b_LoadClipboard_Click(object sender, EventArgs e)
         {
 
-            if (!CheckClipboard())
-            {
-                return;
-            }
-            else
+            if (CheckClipboard())
             {
                 //Clipboard is OK, start processing
                 b_PasteClipBoard.Enabled = false;
@@ -47,10 +32,10 @@ namespace NAVObjectVersion
                 ProcessClipboard();
 
                 this.Cursor = Cursors.Default;
-                MessageBox.Show("Finished!","Success",MessageBoxButtons.OK,MessageBoxIcon.Information);
+                MessageBox.Show("Finished!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 b_PasteClipBoard.Text = "Paste Clipboard";
                 b_PasteClipBoard.Enabled = true;
-            }           
+            }       
         }
 
         private bool CheckClipboard()
@@ -169,14 +154,6 @@ namespace NAVObjectVersion
                         xlWorkSheet.Cells[currRow, currCol] = FormatDate(xlWorkSheet.Cells[currRow, currCol].Value.ToString());
                     }
                 }
-
-                /*
-                //Change Version Header Text to match Release Notes Header Text
-                if (xlWorkSheet.Cells[1, currCol].Value.ToString() == "Version List")
-                {
-                    xlWorkSheet.Cells[1, currCol] = "Version";
-                }
-                */
             }
 
 
@@ -198,6 +175,8 @@ namespace NAVObjectVersion
             object templatePath = templateFileDialog.FileName;
             string templateFileName = Path.GetFileNameWithoutExtension(templateFileDialog.FileName);
 
+            this.Cursor = Cursors.WaitCursor;
+
             bool showWord = true;            
             WordApp.Visible = showWord;
             object visible = true;
@@ -206,13 +185,13 @@ namespace NAVObjectVersion
             object workingPath = @"C:\Temp\" + templateFileName + "-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".docx";
             File.Copy(templatePath.ToString(), workingPath.ToString(), true);
 
-            this.Cursor = Cursors.WaitCursor;
+            tempFilesCreated.Add(workingPath.ToString());
 
             Word.Document docs = WordApp.Documents.Open(ref workingPath, ref miss, ref miss,
-                                           ref miss, ref miss, ref miss, ref miss,
-                                           ref miss, ref miss, ref miss, ref visible,
-                                           ref miss, ref miss, ref miss, ref miss,
-                                           ref miss);
+                                        ref miss, ref miss, ref miss, ref miss,
+                                        ref miss, ref miss, ref miss, ref visible,
+                                        ref miss, ref miss, ref miss, ref miss,
+                                        ref miss);
 
             //Get First Word Table
             Word.Table wordTable = docs.Tables[1];
@@ -300,7 +279,6 @@ namespace NAVObjectVersion
                 }
             }
 
-
             //xlWorkBook.SaveAs(@"C:\Temp\csharp-Excel.xls", Excel.XlFileFormat.xlWorkbookNormal, misValue, misValue, misValue, misValue, Excel.XlSaveAsAccessMode.xlExclusive, misValue, misValue, misValue, misValue, misValue);
             xlWorkBook.Close(false, miss, miss);
 
@@ -317,7 +295,6 @@ namespace NAVObjectVersion
             xlWorkSheet = null;
             xlWorkBook = null;
             xlApp = null;
-
 
             //Clear Word variables
             if (!showWord)
@@ -367,6 +344,44 @@ namespace NAVObjectVersion
             {
                 return DateTime.ParseExact(oldDate, "dd/MM/yy", CultureInfo.InvariantCulture).ToString("dd/MM/yy");
             }
+        }
+
+        private void mainForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            closeForm();
+        }
+
+        private void closeForm()
+        {
+            try
+            {
+                if (tempFilesCreated.Count > 0)
+                {
+                    foreach (string tempFile in tempFilesCreated)
+                    {
+                        File.Delete(tempFile);
+                        tempFilesCreated.Remove(tempFile);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DialogResult dialogResult = MessageBox.Show("You have some NAV version Word Documents open and they cannot be deleted. " + "\n" +
+                                                            "Please close them first and then click Yes in this dialog." + "\n" +
+                                                            "Do you want to retry to correctly close the application now?"
+                                                            ,"Delete Temporary Word Files Warning", MessageBoxButtons.YesNo);
+                if (dialogResult == DialogResult.Yes)
+                {
+                    closeForm();
+                }
+                else if (dialogResult == DialogResult.No)
+                {
+                    if (tempFilesCreated.Count > 0)
+                    {
+                        MessageBox.Show("Some Word Documents created, were not deleted as they are still open. Please delete them from C:\\Temp\\ folder", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
+            }            
         }
     }
 }
