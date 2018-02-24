@@ -20,6 +20,16 @@ namespace NAVObjectVersion
         public mainForm()
         {
             InitializeComponent();
+
+            /*
+            TODO:
+            Error Checking
+            Beautify
+            Check for wrong clipboard
+            check for empty clipboard
+            try to skip having a local copy of word document
+            user settings for template?
+            */
         }
 
         private void b_LoadClipboard_Click(object sender, EventArgs e)
@@ -118,19 +128,27 @@ namespace NAVObjectVersion
             openFileDialog1.ShowDialog();
             //txtDocument.Text = openFileDialog1.FileName;
 
+            bool showWord = true;
+
             Word.Application WordApp = new Word.Application();
+            WordApp.Visible = showWord;
+
             object miss = System.Reflection.Missing.Value;
             object path = openFileDialog1.FileName;
-            object path2 = path + "new.docx";
+
+            Random random = new Random();
+            int randomNumber = random.Next(0, 100);
+            object path2 = path + randomNumber.ToString() + ".docx";
             File.Copy(path.ToString(), path2.ToString(), true);
             object readOnly = false;
             object SaveChanges = true;
-
+            object visible = true;
+            
             this.Cursor = Cursors.WaitCursor;
 
             Word.Document docs = WordApp.Documents.Open(ref path2, ref miss, ref readOnly,
                                            ref miss, ref miss, ref miss, ref miss,
-                                           ref miss, ref miss, ref miss, ref miss,
+                                           ref miss, ref miss, ref miss, ref visible,
                                            ref miss, ref miss, ref miss, ref miss,
                                            ref miss);
 
@@ -240,9 +258,12 @@ namespace NAVObjectVersion
 
 
             //Clear Word variables
-            docs.Close(SaveChanges);
-            WordApp.Application.Quit(SaveChanges);
-            WordApp.Quit();
+            if (!showWord)
+            {
+                docs.Close(SaveChanges);
+                WordApp.Application.Quit(SaveChanges);
+                WordApp.Quit();
+            }
 
             Marshal.ReleaseComObject(wordHeadRow);
             Marshal.ReleaseComObject(wordTable);
