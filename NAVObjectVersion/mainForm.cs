@@ -367,9 +367,6 @@ namespace NAVObjectVersion
 
         private void closeForm()
         {
-            b_PasteClipBoard.Text = "Waiting for Word to close.";
-            System.Threading.Thread.Sleep(3000); //Wait for MS Word to close;
-
             try
             {
                 if (tempFilesCreated.Count > 0)
@@ -393,10 +390,7 @@ namespace NAVObjectVersion
                 }
                 else if (dialogResult == DialogResult.No)
                 {
-                    if (tempFilesCreated.Count > 0)
-                    {
-                        MessageBox.Show("Some Word Documents created, were not deleted as they are still open. Please delete them from " + TempDir + " folder", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
+                    MessageBox.Show("Some Word Documents created, were not deleted as they are still open.\nPlease delete them manually from " + TempDir + " folder", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
             }            
         }
