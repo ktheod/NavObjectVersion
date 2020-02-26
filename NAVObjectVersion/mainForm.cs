@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -13,36 +14,68 @@ namespace NAVObjectVersion
     {
 
         List<string> tempFilesCreated = new List<string>();
-        string TempDir = @"C:\Temp\";
+        int FilesRemaining;
 
         public MainForm()
         {
             InitializeComponent();
 
+            RefreshUIFromSettings();
         }
 
         private void b_LoadClipboard_Click(object sender, EventArgs e)
         {
+            b_PasteClipBoard.Text = "Preparing copied Data";
+            b_PasteClipBoard.Enabled = false;
+            this.Cursor = Cursors.WaitCursor;
 
-            if (CheckClipboard())
+            if (CheckSettingsAndClipboard())
             {
                 //Clipboard is OK, start processing
-                b_PasteClipBoard.Enabled = false;
-                this.Cursor = Cursors.WaitCursor;
-
                 if (ProcessClipboard())
                 {
-                    MessageBox.Show("Finished!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    if (Properties.Settings.Default.UseClipboard)
+                    {
+                        MessageBox.Show("Object list copied to Clipboard." + "\n" + "You can now paste it anywhere you want! :)", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Finished! You can now go to Word! :)", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
                 }
+            }
 
-                this.Cursor = Cursors.Default;
-                b_PasteClipBoard.Text = "Paste Clipboard";
-                b_PasteClipBoard.Enabled = true;
-            }       
+            this.Cursor = Cursors.Default;
+            b_PasteClipBoard.Text = "Paste NAV Object list";
+            b_PasteClipBoard.Enabled = true;
         }
 
-        private bool CheckClipboard()
+        private bool CheckSettingsAndClipboard()
         {
+            //Check Settings
+            string templatePath = Properties.Settings.Default.TemplatePath;
+            string templateFileName = Properties.Settings.Default.TemplateFileName;
+
+            if ((templatePath == "") || (templateFileName == ""))
+            {
+                MessageBox.Show("You haven't selected any template. Please restart your process.", "Template Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Properties.Settings.Default.TemplatePath = "";
+                Properties.Settings.Default.TemplateFileName = "";
+                RefreshUIFromSettings();
+                return false;
+            }
+            else
+            {
+                if (!File.Exists(templatePath))
+                {
+                    MessageBox.Show("File " + templatePath + " doesn't exist. Select new template", "Template Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    Properties.Settings.Default.TemplatePath = "";
+                    Properties.Settings.Default.TemplateFileName = "";
+                    RefreshUIFromSettings();
+                    return false;
+                }
+            }
+
             //Check if Clipboard contains NAV objects list
             bool ClipBoardErrorsExist = false;
             using (StringReader reader = new StringReader(Clipboard.GetText()))
@@ -73,7 +106,7 @@ namespace NAVObjectVersion
 
             if (xlApp == null)
             {
-                MessageBox.Show("Excel is not properly installed!!","Excel COM error",MessageBoxButtons.OK,MessageBoxIcon.Error);
+                MessageBox.Show("Excel is not properly installed!!", "Excel COM error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return false;
             }
 
@@ -165,33 +198,16 @@ namespace NAVObjectVersion
 
             //Copy Data To Word
             this.Cursor = Cursors.Default;
-
-            // Create an instance of the Open File Dialog Box
-            var templateFileDialog = new OpenFileDialog();
-
-            // Set filter options and filter index
-            templateFileDialog.Title = "Select Table Template  Word File";
-            templateFileDialog.Filter = "Word Documents (.docx)|*.docx";
-            templateFileDialog.FilterIndex = 1;
-            templateFileDialog.Multiselect = false;
-            templateFileDialog.ShowDialog();
-            object templatePath = templateFileDialog.FileName;
-            string templateFileName = Path.GetFileNameWithoutExtension(templateFileDialog.FileName);
-            //Check if user selected a template file or cancelled.
-            if (templateFileName == null || templateFileName == "")
-            {
-                MessageBox.Show("You didn't select any template. Please restart your process.", "Template Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return false;
-            }
             this.Cursor = Cursors.WaitCursor;
 
-            bool showWord = true;            
+            bool showWord = !Properties.Settings.Default.UseClipboard;
             WordApp.Visible = showWord;
             object visible = true;
             object SaveChanges = true;
 
-            //Check if C:\Temp exists else create it
-            Directory.CreateDirectory(TempDir);
+            string templatePath = Properties.Settings.Default.TemplatePath;
+            string templateFileName = Path.GetFileNameWithoutExtension(Properties.Settings.Default.TemplateFileName);
+            string TempDir = @Path.GetDirectoryName(templatePath) + @"\";
 
             object workingPath = TempDir + templateFileName + "-" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".docx";
             //Copy the template so we don't make any changes in it.
@@ -199,6 +215,7 @@ namespace NAVObjectVersion
 
             tempFilesCreated.Add(workingPath.ToString());
 
+            //Open Word Template
             Word.Document docs = WordApp.Documents.Open(ref workingPath, ref miss, ref miss,
                                         ref miss, ref miss, ref miss, ref miss,
                                         ref miss, ref miss, ref miss, ref visible,
@@ -291,7 +308,7 @@ namespace NAVObjectVersion
                 }
             }
 
-            //xlWorkBook.SaveAs(@"C:\Temp\csharp-Excel.xls", Excel.XlFileFormat.xlWorkbookNormal, misValue, misValue, misValue, misValue, Excel.XlSaveAsAccessMode.xlExclusive, misValue, misValue, misValue, misValue, misValue);
+            //Close Excel
             xlWorkBook.Close(false, miss, miss);
 
             //Clear Excel Variables
@@ -311,6 +328,11 @@ namespace NAVObjectVersion
             //Clear Word variables
             if (!showWord)
             {
+                //Copy Table to Clipboard
+                docs.ActiveWindow.Selection.WholeStory();
+                docs.ActiveWindow.Selection.Copy();
+
+                //Close Word
                 docs.Close(SaveChanges);
                 WordApp.Application.Quit(SaveChanges);
                 WordApp.Quit();
@@ -332,7 +354,7 @@ namespace NAVObjectVersion
         //Field Formatting Functions
         private string FormatType(string objTypeNum)
         {
-            switch(objTypeNum)
+            switch (objTypeNum)
             {
                 case "Type": return "Type";
                 case "1": return "Table";
@@ -362,37 +384,93 @@ namespace NAVObjectVersion
 
         private void mainForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            closeForm();
+            closeForm(true);
         }
 
-        private void closeForm()
+        private void closeForm(bool CalledByUser)
         {
-            try
+            if (CalledByUser)
+                FilesRemaining = tempFilesCreated.Count;
+
+            if (tempFilesCreated.Count > 0)
             {
-                if (tempFilesCreated.Count > 0)
+                foreach (string tempFile in tempFilesCreated)
                 {
-                    foreach (string tempFile in tempFilesCreated)
+                    FilesRemaining -= 1;
+                    try
                     {
                         File.Delete(tempFile);
-                        tempFilesCreated.Remove(tempFile);
+                        //tempFilesCreated.Remove(tempFile);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (FilesRemaining <= 0)
+                        {
+                            DialogResult dialogResult = MessageBox.Show("You have some NAV version Word Documents open and they cannot be deleted. " + "\n" +
+                                                                        "Please close them first and then click Yes in this dialog." + "\n" +
+                                                                        "Do you want to retry to correctly close the application now?"
+                                                                        , "Delete Temporary Word Files Warning", MessageBoxButtons.YesNo);
+                            if (dialogResult == DialogResult.Yes)
+                            {
+                                closeForm(false);
+                            }
+                            else if (dialogResult == DialogResult.No)
+                            {
+                                MessageBox.Show("Some Word Documents created, were not deleted as they are still open.\nPlease delete them manually", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            }
+                        }
+                        else
+                        {
+                            closeForm(false);
+                        }
                     }
                 }
             }
-            catch (Exception ex)
+        }
+
+        private void txt_TemplatePath_DoubleClick(object sender, EventArgs e)
+        {
+            // Create an instance of the Open File Dialog Box
+            var templateFileDialog = new OpenFileDialog();
+
+            // Set filter options and filter index
+            templateFileDialog.Title = "Select Table Template  Word File";
+            templateFileDialog.Filter = "Word Documents (.docx)|*.docx";
+            templateFileDialog.FilterIndex = 1;
+            templateFileDialog.Multiselect = false;
+            templateFileDialog.ShowDialog();
+            string templatePath = templateFileDialog.FileName;
+            string templateFileName = Path.GetFileNameWithoutExtension(templateFileDialog.FileName);
+            //Check if user selected a template file or cancelled.
+            if (templateFileName == null || templateFileName == "")
             {
-                DialogResult dialogResult = MessageBox.Show("You have some NAV version Word Documents open and they cannot be deleted. " + "\n" +
-                                                            "Please close them first and then click Yes in this dialog." + "\n" +
-                                                            "Do you want to retry to correctly close the application now?"
-                                                            ,"Delete Temporary Word Files Warning", MessageBoxButtons.YesNo);
-                if (dialogResult == DialogResult.Yes)
-                {
-                    closeForm();
-                }
-                else if (dialogResult == DialogResult.No)
-                {
-                    MessageBox.Show("Some Word Documents created, were not deleted as they are still open.\nPlease delete them manually from " + TempDir + " folder", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-            }            
+                MessageBox.Show("You haven't select any template. Please restart your process.", "Template Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            Properties.Settings.Default.TemplatePath = @templatePath;
+            Properties.Settings.Default.TemplateFileName = templateFileName;
+            Properties.Settings.Default.Save();
+
+            RefreshUIFromSettings();
+        }
+
+        private void chb_UseClipboard_CheckedChanged(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.UseClipboard = chb_UseClipboard.Checked;
+            Properties.Settings.Default.Save();
+
+            RefreshUIFromSettings();
+        }
+
+        private void RefreshUIFromSettings()
+        {
+            Properties.Settings.Default.Reload();
+            txt_TemplatePath.Text = Properties.Settings.Default.TemplateFileName;
+            chb_UseClipboard.Checked = Properties.Settings.Default.UseClipboard;
+        }
+
+        private void lbl_github_Click(object sender, EventArgs e)
+        {
+            Process.Start("https://github.com/ktheod");
         }
     }
 }
