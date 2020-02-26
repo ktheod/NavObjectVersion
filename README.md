@@ -10,6 +10,10 @@ You have the option to either open the created Word document to edit it or to co
 
 Hopefully this will save everyone a lot of time.
 
+Requirements: 
+- .NET 4.5
+- MS Word, MS Excel
+
 To Install, simply download the release ZIP file, unzip it, run setup.exe and then copy file NAVObjectVersion_Template.docx to whatever folder you want to save it.
 
 To Run it, locate the app in your Windows Start Menu.
