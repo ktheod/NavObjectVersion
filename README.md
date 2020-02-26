@@ -1,7 +1,7 @@
 # NavObjectVersion
 This tiny application will assist all NAV Developers to easily export their project's object list from NAV Object Designer and format it in a customer facing presentable way.
 
-No more replacing Type 1 to Table or changing the date format.
+No more replacing Type 1 to Table!
 
 You can simply select your objects in NAV, copy them (Ctrl+C) and paste them in the app.
 The app will use the template Word file provided and will output a formatted object list ready to use in your release note or email.
